@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="dongdong devlog.">
-    <title>dongdong devlog.</title>
+    <title>HDFS Federation이란? - dongdong devlog.</title>
     <meta name="author" content="dongdong">
     
     
@@ -17,16 +17,23 @@
             <link rel="alternate" type="application/atom+xml" title="RSS" href="/atom.xml">
         
     
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"Website","@id":"http://hoon-e.github.io","author":{"@type":"Person","name":"dongdong","sameAs":["https://github.com/hoon-e"],"image":"dong.png"},"name":"dongdong devlog.","description":"junior backend developer","url":"http://hoon-e.github.io"}</script>
-    <meta name="description" content="junior backend developer">
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"dongdong","sameAs":["https://github.com/hoon-e"],"image":"dong.png"},"articleBody":"나중에 사용할 수도 있을 것 같아 Hadoop3 버전부터 신규로 추가된 페더레이션 기능을 공부해보았다.Hadoop 공식 문서 중 HDFS Federation 부분을 번역한 내용이다. \n\n배경\nHDFS는 두 가지의 레이어를 가지고 있다.\n\n\nNamespace\n디렉토리, 파일, 블록으로 구성되어 있다.\n생성, 삭제, 변경, 파일과 디렉토리 나열과 같은 파일 시스템 작업들을 지원한다.\n\n\nBlock Storage Service\n블록 스토리지 서비스는 블록 관리와 저장소 두 가지로 분류 할 수 있다.\n블록 관리(Block Management) - 네임 노드에서 수행된다.\n등록 작업 및 주기적인 heartbeat를 체크하여, 데이터 노드들 간의 클러스터 멤버십을 제공한다.\n블록 리포트를 처리하고 블록들의 위치를 유지한다.\n생성, 삭제, 변경, 블록 위치 반환과 같은 블록 연관 작업을 지원한다.\n복제본 배치, 덜 복제된 블록들의 복제 작업을 관리하고 초과로 복제된 블록들은 삭제한다.\n\n\n저장소(Storage)\n데이터 노드에 의해 제공된다.\n로컬 파일 시스템에 블록을 저장하고 읽기/쓰기 접근을 허용한다.\n\n\n\n\n\n이전의 HDFS 아키텍쳐에서는전체 클러스터에 단 하나의 네임스페이스만을 허용했다.이 구성에서는 단일 네임 노드가 네임 스페이스를 관리했다.HDFS 페더레이션은  HDFS에 여러 네임 노드 / 네임 스페이스에 대한 지원을 추가해서, 이러한 제약 조건을 해결하였다.\n여러 개의 네임 노드 / 네임 스페이스HDFS 페더레이션에 대해 설명하면 다음과 같다.\n\n여러 개의 네임 스페이스들을 수평적으로 확장하기 위해서 페더레이션에서는 여러개의 독립적인 네임 노드 / 네임 스페이스를 사용한다.\n네임 노드들은 서로 연합된다.\n네임 노드들은 서로 독립적이고, 서로 간의 코디네이션이 필요없다.\n데이터 노드들은 모든 네임 노드들의 공통적인 저장소로서 사용된다.\n각 데이터 노드는 클러스터 내의 모든 네임 노드들에 등록된다.\n데이터 노드는 주기적인 heartbeat 및 블록 리포트를 전송하고, 네임 노드의 명령을 처리한다.\n\n사용자는 ViewFs를 사용해서 개인화된 네임 스페이스 뷰를 만들 수 있다.\nBlock Pool블록 풀은 단일 네임 스페이스에 속하는 블록들의 집합이다.데이터 노드는 클러스터의 모든 블록 풀에 대한 블록을 저장하게된다.각 블록 풀은 독립적으로 관리된다. 이를 통해서 네임 스페이스는 다른 네임 스페이스와 조정 없이 새롭게 생성되는 블록에 대한 블록 ID를 생성할 수 있다.특정 네임 노드에 장애가 발생하더라도, 데이터 노드가 클러스터 내의 다른 네임 노드와 동작하는 것에 영향을 주지 않는다.\n네임 스페이스와 관련된 블록 풀을 묶어서 네임 스페이스 볼륨(Namespace volume) 이라고 부른다.네임 노드 / 네임 스페이스가 삭제되면, 데이터 노드의 해당 블록 풀들도 같이 사라진다.각 네임 스페이스 볼륨은 클러스터 업그레이드 시에 하나의 단위로서 업그레이드 된다.\n클러스터 ID( cluster id )클러스터 ID 식별자는 클러스터의 모든 노드들을 식별하는 데에 사용된다.네임 노드 형식이 지정되면, 식별자가 제공되거나 자동으로 생성된다.이 ID는 다른 네임 노드들을 클러스터로 포함시키는데에 사용해야 한다.\n그렇다면 HDFS 페더레이션을 하게되면 생기는 이점은 무엇일까\n\n네임 스페이스 확장성(Namespace Scalability)\n페더레이션은 네임 스페이스를 수평적으로 확장할 수 있도록 한다.\n다수의 작은 파일을 사용하는 배포 혹은 대규모 배포에서 더 많은 네임 노드를 클러스터에 추가할 수 있도록 해서 이점을 얻을 수 있다.\n\n\n성능(Performance)\n클러스터에 여러 네임 노드가 추가되면 파일 시스템 읽기/쓰기 처리량이 늘어나게된다.\n\n\n격리(Isolation)\n하나의 네임 노드는 다중 사용자 환경에서 격리를 제공하지 못한다.\n예를 들어 실험용 어플리케이션이 네임 노드에 부하를 주어, 실제로 프로덕션에서 중요한 작업이 느려지는 경우를 막을 수 있다.\n이러한 경우 네임 노드에 부하가 가지 않도록 어플리케이션과 사용자의 범주를 네임스페이스 별로 따로 분리할 수 있다.\n\n\n\n페더레이션 설정페더레이션 설정은 이전 버전과도 호환이 되고, 기존에 동작하던 단일 네임 노드 구성에 변경없이 동작할 수 있도록 지원한다.새 설정값은 클러스터 노드 유형에 따라서 다르게 배포할 필요없이, 클러스터의 모든 노드가 동일한 구성을 가지도록 설계되었다.\n페더레이션은 새로운 nameserviceID 추상화를 추가한다.네임 노드와 연관되어있는 세컨더리, 백업, 체크포인터 노드들은 이 nameserviceId에 포함된다.단일 설정 파일을 지원하기 위해서, 네임 노드 및 세컨더리, 백업, 체크포인터 노드 설정 매개변수의 접미사로 nameserviceID가 사용된다.\n설정하기step 1.dfs.nameservices 속성값을 설정파일에 추가하고, nameserviceId를 콤마로 구분하여 넣는다. 이 설정값은 데이터 노드들이 클러스터 내의 네임 노드들을 구분하는 데 사용된다.\nstep 2.각 네임노드 및 세컨더리 네임노드, 백업 노드, 체크 포인터에 대해서 해당 nameserviceId 접미사가 붙은 속성값들을 설정 파일에 추가한다.\n\n\n\n데몬\n설정값\n\n\n\n네임 노드\ndfs.namenode.rpc-address dfs.namenode.servicerpc-address dfs.namenode.http-addressdfs.namenode.https-addressdfs.namenode.keytab.filedfs.namenode.name.dirdfs.namenode.edits.dirdfs.namenode.checkpoint.dirdfs.namenode.checkpoint.edits.dir\n\n\n세컨더리 네임노드\ndfs.namenode.secondary.http-addressdfs.secondary.namenode.keytab.file\n\n\n백업 노드\ndfs.namenode.backup.addressdfs.secondary.namenode.keytab.file\n\n\n\n두 개의 네임 노드들의 설정값을 예로 들면 해당 속성값 뒤에 .namespaceId가 붙어있는 것을 확인할 수 있다.\n12345678910111213141516&lt;configuration&gt;  &lt;property&gt;    &lt;name&gt;dfs.nameservices&lt;/name&gt;    &lt;value&gt;ns1,ns2&lt;/value&gt;  &lt;/property&gt;  ..  &lt;property&gt;    &lt;name&gt;dfs.namenode.http-address.ns1&lt;/name&gt;    &lt;value&gt;nn-host1:http-port&lt;/value&gt;  &lt;/property&gt;  &lt;property&gt;    &lt;name&gt;dfs.namenode.http-address.ns2&lt;/name&gt;    &lt;value&gt;nn-host2:http-port&lt;/value&gt;  &lt;/property&gt;&lt;/configuration&gt;\n\n동작하고 있는 HDFS 클러스터에 새로운 네임노드 추가하기\n설정 파일에 dfs.nameservices 속성을 추가한다.\nnameserviceId 접미사로 설정을 업데이트한다. 설정 키 이름은 릴리스 0.20 이후 변경 되었으며 페더레이션을 사용하려면 새로운 설정 매개 변수 이름을 사용해야한다.\n설정 파일에 새로운 네임노드 관련 속성값을 추가한다.\n클러스터 내의 모든 노드들에 해당 설정파일을 적용한다.\n새로운 네임 노드와 세컨 더리/백업 노드를 시작한다.\n새롭게 추가된 네임 노드를 데이터 노드들에게 알리기 위해 모든 데이터 노드들에서 해당 커맨드를 실행시켜준다.1$HADOOP_HOME/bin/hdfs dfsadmin -refreshNamenodes &lt;datanode_host_name&gt;:&lt;datanode_ipc_port&gt;\n\n문서 링크 : HDFS Federation\n","dateCreated":"2021-05-19T22:31:11+09:00","dateModified":"2021-05-20T00:14:55+09:00","datePublished":"2021-05-19T22:31:11+09:00","description":"","headline":"HDFS Federation이란?","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"http://hoon-e.github.io/2021/05/19/hdfs-federation/"},"publisher":{"@type":"Organization","name":"dongdong","sameAs":["https://github.com/hoon-e"],"image":"dong.png","logo":{"@type":"ImageObject","url":"dong.png"}},"url":"http://hoon-e.github.io/2021/05/19/hdfs-federation/","keywords":"hadoop, hdfs"}</script>
+    <meta name="description" content="나중에 사용할 수도 있을 것 같아 Hadoop3 버전부터 신규로 추가된 페더레이션 기능을 공부해보았다.Hadoop 공식 문서 중 HDFS Federation 부분을 번역한 내용이다.   배경 HDFS는 두 가지의 레이어를 가지고 있다.   Namespace 디렉토리, 파일, 블록으로 구성되어 있다. 생성, 삭제, 변경, 파일과 디렉토리 나열과 같은 파일 시">
 <meta property="og:type" content="blog">
-<meta property="og:title" content="dongdong devlog.">
-<meta property="og:url" content="http://hoon-e.github.io/index.html">
+<meta property="og:title" content="HDFS Federation이란?">
+<meta property="og:url" content="http://hoon-e.github.io/2021/05/19/hdfs-federation/index.html">
 <meta property="og:site_name" content="dongdong devlog.">
-<meta property="og:description" content="junior backend developer">
+<meta property="og:description" content="나중에 사용할 수도 있을 것 같아 Hadoop3 버전부터 신규로 추가된 페더레이션 기능을 공부해보았다.Hadoop 공식 문서 중 HDFS Federation 부분을 번역한 내용이다.   배경 HDFS는 두 가지의 레이어를 가지고 있다.   Namespace 디렉토리, 파일, 블록으로 구성되어 있다. 생성, 삭제, 변경, 파일과 디렉토리 나열과 같은 파일 시">
 <meta property="og:locale" content="ko_KR">
+<meta property="og:image" content="http://hoon-e.github.io/image/hdfs.png">
+<meta property="og:image" content="http://hoon-e.github.io/image/viewfs.png">
+<meta property="article:published_time" content="2021-05-19T13:31:11.000Z">
+<meta property="article:modified_time" content="2021-05-19T15:14:55.581Z">
 <meta property="article:author" content="dongdong">
+<meta property="article:tag" content="hadoop">
+<meta property="article:tag" content="hdfs">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://hoon-e.github.io/image/hdfs.png">
     
     
         
@@ -65,6 +72,8 @@
     
 
     
+        
+    
 </head>
 
     <body>
@@ -78,7 +87,7 @@
         
     
 
-<header id="header" data-behavior="1">
+<header id="header" data-behavior="4">
     <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
     <div class="header-title">
         <a
@@ -111,7 +120,7 @@
         
     
 
-<nav id="sidebar" data-behavior="1">
+<nav id="sidebar" data-behavior="4">
     <div class="sidebar-container">
         
             <div class="sidebar-profile">
@@ -245,29 +254,22 @@
 </nav>
 
             
-            <div id="main" data-behavior="1"
+            <div id="main" data-behavior="4"
                  class="
                         hasCoverMetaIn
                         ">
-                <section class="postShorten-group main-content-wrap">
+                
+<article class="post">
     
     
-    <article class="postShorten postShorten--thumbnailimg-bottom">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a
-                            class="link-unstyled"
-                            href="/2021/05/19/hdfs-federation/"
-                            aria-label=": HDFS Federation이란?"
-                        >
-                            HDFS Federation이란?
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            HDFS Federation이란?
+        </h1>
+    
+    
+        <div class="post-meta">
     <time datetime="2021-05-19T22:31:11+09:00">
 	
 		    2021/05/19
@@ -282,10 +284,13 @@
     
 </div>
 
-            </div>
-            
-                <div class="postShorten-content">
-                    <p>나중에 사용할 수도 있을 것 같아 Hadoop3 버전부터 신규로 추가된 페더레이션 기능을 공부해보았다.<br>Hadoop 공식 문서 중 HDFS Federation 부분을 번역한 내용이다. <br></p>
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <p>나중에 사용할 수도 있을 것 같아 Hadoop3 버전부터 신규로 추가된 페더레이션 기능을 공부해보았다.<br>Hadoop 공식 문서 중 HDFS Federation 부분을 번역한 내용이다. <br></p>
 <h1 id="table-of-contents">목차</h1><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%EB%B0%B0%EA%B2%BD"><span class="toc-text">배경</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%EC%97%AC%EB%9F%AC-%EA%B0%9C%EC%9D%98-%EB%84%A4%EC%9E%84-%EB%85%B8%EB%93%9C-%EB%84%A4%EC%9E%84-%EC%8A%A4%ED%8E%98%EC%9D%B4%EC%8A%A4"><span class="toc-text">여러 개의 네임 노드 &#x2F; 네임 스페이스</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#Block-Pool"><span class="toc-text">Block Pool</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%ED%81%B4%EB%9F%AC%EC%8A%A4%ED%84%B0-ID-cluster-id"><span class="toc-text">클러스터 ID( cluster id )</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%ED%8E%98%EB%8D%94%EB%A0%88%EC%9D%B4%EC%85%98-%EC%84%A4%EC%A0%95"><span class="toc-text">페더레이션 설정</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0"><span class="toc-text">설정하기</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#step-1"><span class="toc-text">step 1.</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#step-2"><span class="toc-text">step 2.</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%EB%8F%99%EC%9E%91%ED%95%98%EA%B3%A0-%EC%9E%88%EB%8A%94-HDFS-%ED%81%B4%EB%9F%AC%EC%8A%A4%ED%84%B0%EC%97%90-%EC%83%88%EB%A1%9C%EC%9A%B4-%EB%84%A4%EC%9E%84%EB%85%B8%EB%93%9C-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0"><span class="toc-text">동작하고 있는 HDFS 클러스터에 새로운 네임노드 추가하기</span></a></li></ol></li></ol>
 <h1 id="배경"><a href="#배경" class="headerlink" title="배경"></a>배경</h1><img src="/image/hdfs.png" width="250px" height="250px">
 HDFS는 두 가지의 레이어를 가지고 있다.
@@ -383,37 +388,80 @@ HDFS는 두 가지의 레이어를 가지고 있다.
 </ul>
 <p>문서 링크 : <a target="_blank" rel="noopener" href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/Federation.html">HDFS Federation</a></p>
 
-                    
-                        
-
-
-                    
-                    
-                        <p>
-                            <a
-                                href="/2021/05/19/hdfs-federation/#post-footer"
-                                class="postShorten-excerpt_link link"
-                                aria-label=""
-                            >
-                                댓글 공유
-                            </a>
-                        </p>
-                    
-                </div>
             
+
+
         </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
         
-    </article>
-    
-    <div class="pagination-bar">
-    <ul class="pagination">
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">태그</span><br/>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/hadoop/" rel="tag">hadoop</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/hdfs/" rel="tag">hdfs</a>
+
+            </div>
         
         
-        <li class="pagination-number">page 1 of 1</li>
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a
+                        class="post-action-btn btn btn--disabled"
+                        aria-hidden="true"
+                    >
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">이전</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    <a
+                        class="post-action-btn btn btn--disabled"
+                        aria-hidden="true"
+                    >
+                        
+                        <span class="hide-xs hide-sm text-small icon-mr">다음</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a
+                class="post-action-btn btn btn--default btn-open-shareoptions"
+                href="#btn-open-shareoptions"
+                aria-label="이 포스트 공유하기"
+            >
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+        
+            
+        
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#table-of-contents" aria-label="목차">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
     </ul>
 </div>
 
-</section>
+
+        
+        
+            
+        
+    </div>
+</article>
+
 
 
                 <footer id="footer" class="main-content-wrap">
@@ -423,6 +471,63 @@ HDFS는 두 가지의 레이어를 가지고 있다.
 </footer>
 
             </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="4">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a
+                        class="post-action-btn btn btn--disabled"
+                        aria-hidden="true"
+                    >
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">이전</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    <a
+                        class="post-action-btn btn btn--disabled"
+                        aria-hidden="true"
+                    >
+                        
+                        <span class="hide-xs hide-sm text-small icon-mr">다음</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a
+                class="post-action-btn btn btn--default btn-open-shareoptions"
+                href="#btn-open-shareoptions"
+                aria-label="이 포스트 공유하기"
+            >
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+        
+            
+        
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#table-of-contents" aria-label="목차">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
             
         </div>
         
@@ -481,6 +586,8 @@ HDFS는 두 가지의 레이어를 가지고 있다.
 
 <!--SCRIPTS END-->
 
+
+    
 
 
 
